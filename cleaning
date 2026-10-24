@@ -1,0 +1,99 @@
+import pandas as pd
+
+# BACA DATA
+sensor = pd.read_csv("24 Mei 2026 Pagi GH/sensor.csv")
+ph = pd.read_csv("24 Mei 2026 Pagi pH GH/pH.csv")
+
+# SIAPKAN DATA pH
+ph = ph.drop(columns=["status"])
+
+# GABUNG BERDASARKAN WAKTU
+data = pd.merge(sensor, ph, on="time", how="inner")
+
+# CLEANING DASAR
+
+# Hapus data kosong
+data = data.dropna()
+
+# Hapus data duplikat
+data = data.drop_duplicates()
+
+# HAPUS DATA ERROR SENSOR
+
+data = data[
+    (data["ph"] >= 0) &
+    (data["ph"] <= 14) &
+    (data["tds"] >= 0) &
+    (data["temperature"] > 0) &
+    (data["temperature"] <= 60) &
+    (data["humidity"] >= 0) &
+    (data["humidity"] <= 100) &
+    (data["distance"] >= 0)
+]
+
+# STATUS GABUNGAN
+def cek_status(row):
+
+    masalah = []
+
+    # TDS
+    if row["tds"] < 600:
+        masalah.append("TDS Rendah")
+    elif row["tds"] > 1200:
+        masalah.append("TDS Tinggi")
+
+    # pH
+    if row["ph"] < 5.5:
+        masalah.append("pH Rendah")
+    elif row["ph"] > 6.5:
+        masalah.append("pH Tinggi")
+
+    # Suhu
+    if row["temperature"] < 18:
+        masalah.append("Suhu Rendah")
+    elif row["temperature"] > 28:
+        masalah.append("Suhu Tinggi")
+
+    # Level air
+    if row["distance"] <= 20:
+        masalah.append("Level Air Rendah")
+
+    if len(masalah) == 0:
+        return "Normal"
+
+    return ", ".join(masalah)
+
+data["status"] = data.apply(cek_status, axis=1)
+
+# SUSUN ULANG KOLOM
+data = data[
+    [
+        "time",
+        "temperature",
+        "humidity",
+        "distance",
+        "tds",
+        "ph",
+        "status"
+    ]
+]
+
+# INFORMASI DATA
+print("\nJumlah data akhir:", len(data))
+
+print("\nData kosong:")
+print(data.isnull().sum())
+
+print("\nData duplikat:")
+print(data.duplicated().sum())
+
+print("\nStatistik data:")
+print(data.describe())
+
+print("\n5 Data pertama:")
+print(data.head())
+
+# SIMPAN HASIL
+data.to_csv("gabungan_clean.csv", index=False)
+
+print("\nFile berhasil disimpan: gabungan_clean.csv")
